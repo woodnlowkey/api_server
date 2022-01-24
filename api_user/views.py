@@ -247,7 +247,9 @@ class SandwichView(APIView):
             bread_object, topping_object, 
             cheese_object, sauce_object
             ]
+        # 별도의 함수를 통해 없는 재료가 있는 지 확인
         check_stock = check_ingredients(ingredient_objects)
+        # 없는 재료가 있다면 알림
         if check_stock:
             return Response(f"no more {check_stock}", status=status.HTTP_400_BAD_REQUEST)
         # 유효한 요청을 확인
@@ -271,6 +273,7 @@ class SandwichView(APIView):
             if kwargs.get('sandwich_kw') in kw_list and kwargs.get('kw_kn'):
                 sandwich_queryset = search_kw_kn(sandwich_queryset, kwargs.get('sandwich_kw'), kwargs.get('kw_kn'))
             # 페이지 요청이 있는 지 확인
+            # paginator 활용 pagination
             if kwargs.get('page'):
                 paginator = Paginator(sandwich_queryset, 10)
                 page = kwargs.get('page')
@@ -278,30 +281,49 @@ class SandwichView(APIView):
             else:
                 sandwich_queryset_serializer = SandwichSerializer(sandwich_queryset, many=True)
             return Response(sandwich_queryset_serializer.data, status=status.HTTP_200_OK)
+        # id가 요청에 있는 경우
         else:
             sandwich_id = kwargs.get('sandwich_id') # id에 해당하는 sandwich의 정보를 불러온다.
             sandwich = Sandwich.objects.get(id=sandwich_id)
+            # 상세 정보 가져오기
             bread_object = Bread.objects.get(id=sandwich.bread_id)
             topping_object = Topping.objects.get(id=sandwich.topping_id)
             cheese_object = Cheese.objects.get(id=sandwich.cheese_id)
             sauce_object = Sauce.objects.get(id=sandwich.sauce_id)
-            # sandwich_serializer = SandwichSerializer(Sandwich.objects.get(id=sandwich_id))
-            # return Response(sandwich_serializer.data, status=status.HTTP_200_OK)
+            # 빵, 토핑, 치즈, 소스의 이름, 재고, 가격 정보 제공
             return Response({sandwich.id:{
                     'bread':{'name':bread_object.name, 'stock':bread_object.stock, 'price':bread_object.price},
                     'topping':{'name':topping_object.name, 'stock':topping_object.stock, 'price':topping_object.price}, 
                     'cheese':{'name':cheese_object.name, 'stock':cheese_object.stock, 'price':cheese_object.price}, 
                     'sauce':{'name':sauce_object.name, 'stock':sauce_object.stock, 'price':sauce_object.price}}}, 
                     status=status.HTTP_200_OK)
-    # 'sandwich/sandwich_id' 로 'delete' 하는 경우 = 소스를 삭제합니다.
+    # 'sandwich/sandwich_id' 로 'delete' 하는 경우 = 샌드위치를 삭제합니다.
     def delete(self, request, **kwargs):
         # id가 요청에 있는 지 확인
         if kwargs.get('sandwich_id') is None:
             return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
+        # id가 요청에 있는 경우
         else:
             sandwich_id = kwargs.get('sandwich_id')
             sandwich_object = Sandwich.objects.get(id=sandwich_id)
-            sandwich_name = sandwich_object.id
+            # 상세 정보 가져오기
+            bread_object = Bread.objects.get(id=sandwich_object.bread_id)
+            topping_object = Topping.objects.get(id=sandwich_object.topping_id)
+            cheese_object = Cheese.objects.get(id=sandwich_object.cheese_id)
+            sauce_object = Sauce.objects.get(id=sandwich_object.sauce_id)
+            ingredient_objects = [
+                bread_object, topping_object, 
+                cheese_object, sauce_object
+                ]
+            # 재료 목록과 총 가격
+            total_ingredients = []
+            total_price = 0
+            for ingredient in ingredient_objects:
+                total_ingredients.append(ingredient.name)
+                total_price += ingredient.price
+                # 재료 되돌리기
+                ingredient.stock += 1
+                ingredient.save()
             sandwich_object.delete()
-            # 삭제한 소스의 이름을 알림
-            return Response(f"{sandwich_name} removed", status=status.HTTP_200_OK)
+            # 삭제한 샌드위치의 재료 목록과 총 가격
+            return Response({sandwich_id:{'total ingredients':total_ingredients, 'total price':total_price}}, status=status.HTTP_200_OK)
