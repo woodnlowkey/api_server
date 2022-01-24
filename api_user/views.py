@@ -1,8 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .serializers import BreadSerializer, ToppingSerializer, CheeseSerializer, SauceSerializer
+from .serializers import BreadSerializer, ToppingSerializer, CheeseSerializer, SauceSerializer, SandwichSerializer
 from rest_framework import status
-from .models import Bread, Topping, Cheese, Sauce
+from .models import Bread, Topping, Cheese, Sauce, Sandwich
 
 class BreadView(APIView):
     # 'bread/' 로 'post' 하는 경우 = 빵을 추가합니다.
@@ -204,4 +204,76 @@ class SauceView(APIView):
             # 삭제한 소스의 이름을 알림
             return Response(f"{sauce_name} removed", status=status.HTTP_200_OK)
 
+# input = list[QueryObject, QueryObject, ...]
+# ouput = List[None] or list[str, str, ...]
+def check_ingredients(ingredient_list):
+    # 재료 중 0개인 재료가 있으면 이름을 반환
+    lacking_ingredients = []
+    for ingredient in ingredient_list:
+        if not ingredient.stock:
+            lacking_ingredients.append(ingredient.name)
+    return lacking_ingredients
 
+class SandwichView(APIView):
+    # 'sandwich/' 로 'post' 하는 경우 = 샌드위치를 만듭니다.
+    def post(self, request):
+        ingredients=request.data
+        sandwich_serializer = SandwichSerializer(data=ingredients) # Request의 data를 SandwichSerializer로 변환
+        # 재료 오브젝트 설정
+        bread_object = Bread.objects.get(id=ingredients['bread'])
+        topping_object = Topping.objects.get(id=ingredients['topping'])
+        cheese_object = Cheese.objects.get(id=ingredients['cheese'])
+        sauce_object = Sauce.objects.get(id=ingredients['sauce'])
+        ingredient_objects = [bread_object, topping_object, cheese_object, sauce_object]
+        check_stock = check_ingredients(ingredient_objects)
+        if check_stock:
+            return Response(f"no more {check_stock}", status=status.HTTP_400_BAD_REQUEST)
+        # 유효한 요청을 확인
+        elif sandwich_serializer.is_valid():
+            sandwich_serializer.save() # SandwichSerializer의 유효성 검사를 한 뒤 DB에 저장
+            # 재료의 재고 -1
+            for ingredient in ingredient_objects:
+                ingredient.stock -= 1
+                ingredient.save()
+            return Response(sandwich_serializer.data, status=status.HTTP_201_CREATED) # client에게 JSON response 전달
+        else:
+            return Response(sandwich_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # 'sandwich/' 로 'get' 하는 경우 = 샌드위치 목록을 조회합니다.
+    # 'sandwich/sandwich_id' 로 'get' 하는 경우 = 샌드위치를 조회합니다.
+    def get(self, request, **kwargs):
+        # id가 요청에 있는 지 확인
+        if kwargs.get('sandwich_id') is None:
+            sandwich_queryset = Sandwich.objects.all() # 모든 sandwich의 정보를 불러온다.
+            sandwich_queryset_serializer = SandwichSerializer(sandwich_queryset, many=True)
+            return Response(sandwich_queryset_serializer.data, status=status.HTTP_200_OK)
+        else:
+            sandwich_id = kwargs.get('sandwich_id')
+            sauce_serializer = SandwichSerializer(Sandwich.objects.get(id=sandwich_id)) # id에 해당하는 sauce의 정보를 불러온다.
+            return Response(sauce_serializer.data, status=status.HTTP_200_OK)
+    # 'sauce/sandwich_id' 로 'put' 하는 경우 = 소스를 수정합니다.
+    def put(self, request, **kwargs):
+        # id가 요청에 있는 지 확인
+        if kwargs.get('sandwich_id') is None:
+            return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
+        else:
+            sandwich_id = kwargs.get('sandwich_id')
+            sauce_object = Sauce.objects.get(id=sandwich_id)
+            update_sauce_serializer = SandwichSerializer(sauce_object, data=request.data)
+            # 유효한 요청을 확인
+            if update_sauce_serializer.is_valid():
+                update_sauce_serializer.save()
+                return Response(update_sauce_serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
+    # 'sauce/sandwich_id' 로 'delete' 하는 경우 = 소스를 삭제합니다.
+    def delete(self, request, **kwargs):
+        # id가 요청에 있는 지 확인
+        if kwargs.get('sandwich_id') is None:
+            return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
+        else:
+            sandwich_id = kwargs.get('sandwich_id')
+            sauce_object = Sauce.objects.get(id=sandwich_id)
+            sauce_name = sauce_object.name
+            sauce_object.delete()
+            # 삭제한 소스의 이름을 알림
+            return Response(f"{sauce_name} removed", status=status.HTTP_200_OK)

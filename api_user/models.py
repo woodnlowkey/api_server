@@ -28,3 +28,10 @@ class Sauce(models.Model):
     class Meta:
         db_table = "Sauce"
 
+class Sandwich(models.Model):
+    bread = models.ForeignKey(Bread, on_delete=models.DO_NOTHING, db_constraint=False)
+    topping = models.ForeignKey(Topping, on_delete=models.DO_NOTHING, db_constraint=False)
+    cheese = models.ForeignKey(Cheese, on_delete=models.DO_NOTHING, db_constraint=False)
+    sauce = models.ForeignKey(Sauce, on_delete=models.DO_NOTHING, db_constraint=False)
+    class Meta:
+        db_table = "Sandwich"

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Bread, Topping, Cheese, Sauce
+from .models import Bread, Topping, Cheese, Sauce, Sandwich
  
 class BreadSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,4 +19,9 @@ class CheeseSerializer(serializers.ModelSerializer):
 class SauceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sauce
+        fields = '__all__'
+
+class SandwichSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sandwich
         fields = '__all__'
