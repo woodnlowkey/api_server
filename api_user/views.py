@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from .serializers import BreadSerializer, ToppingSerializer, CheeseSerializer, SauceSerializer, SandwichSerializer
 from rest_framework import status
 from .models import Bread, Topping, Cheese, Sauce, Sandwich
+from django.core.paginator import Paginator
+from django.db.models import Q
 
 class BreadView(APIView):
     # 'bread/' 로 'post' 하는 경우 = 빵을 추가합니다.
@@ -214,6 +216,23 @@ def check_ingredients(ingredient_list):
             lacking_ingredients.append(ingredient.name)
     return lacking_ingredients
 
+# input = queryset(모든 샌드위치), str(keyword), int(id)
+# output = queryset(검색 결과 샌드위치)
+def search_kw_kn(queryset, kw, kn):
+    if kw == 'bread':
+        queryset = queryset.filter(Q(bread__id__icontains=kn)).distinct()
+    elif kw == 'topping':
+        queryset = queryset.filter(Q(topping__id__icontains=kn)).distinct()
+    elif kw == 'cheese':
+        queryset = queryset.filter(Q(cheese__id__icontains=kn)).distinct()
+    elif kw == 'sauce':
+        queryset = queryset.filter(Q(sauce__id__icontains=kn)).distinct()
+    # elif kw == 'price-upper':
+    #     queryset = queryset.filter(Q(bread__id__icontains=kn)).distinct()
+    # else:
+    #     pass
+    return queryset
+
 class SandwichView(APIView):
     # 'sandwich/' 로 'post' 하는 경우 = 샌드위치를 만듭니다.
     def post(self, request):
@@ -224,7 +243,10 @@ class SandwichView(APIView):
         topping_object = Topping.objects.get(id=ingredients['topping'])
         cheese_object = Cheese.objects.get(id=ingredients['cheese'])
         sauce_object = Sauce.objects.get(id=ingredients['sauce'])
-        ingredient_objects = [bread_object, topping_object, cheese_object, sauce_object]
+        ingredient_objects = [
+            bread_object, topping_object, 
+            cheese_object, sauce_object
+            ]
         check_stock = check_ingredients(ingredient_objects)
         if check_stock:
             return Response(f"no more {check_stock}", status=status.HTTP_400_BAD_REQUEST)
@@ -244,7 +266,17 @@ class SandwichView(APIView):
         # id가 요청에 있는 지 확인
         if kwargs.get('sandwich_id') is None:
             sandwich_queryset = Sandwich.objects.all() # 모든 sandwich의 정보를 불러온다.
-            sandwich_queryset_serializer = SandwichSerializer(sandwich_queryset, many=True)
+            # 검색 조건이 요청에 있는 지 확인
+            kw_list = ('bread', 'topping', 'cheese', 'sauce', 'price-upper', 'price-lower')
+            if kwargs.get('sandwich_kw') in kw_list:
+                sandwich_queryset = search_kw_kn(sandwich_queryset, kwargs.get('sandwich_kw'), kwargs.get('kw_kn'))
+            # 페이지 요청이 있는 지 확인
+            if kwargs.get('page'):
+                paginator = Paginator(sandwich_queryset, 10)
+                page = kwargs.get('page')
+                sandwich_queryset_serializer = SandwichSerializer(paginator.get_page(page), many=True)
+            else:
+                sandwich_queryset_serializer = SandwichSerializer(sandwich_queryset, many=True)
             return Response(sandwich_queryset_serializer.data, status=status.HTTP_200_OK)
         else:
             sandwich_id = kwargs.get('sandwich_id')
