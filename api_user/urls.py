@@ -12,7 +12,7 @@ urlpatterns = [
     path('sauce/', views.SauceView.as_view()),
     path('sauce/<int:sauce_id>/', views.SauceView.as_view()),
     path('sandwich/', views.SandwichView.as_view()),
-    path('sandwich/<int:page>/<str:sandwich_kw>/<int:kw_kn>/', views.SandwichView.as_view()),
     path('sandwich/<int:page>/', views.SandwichView.as_view()),
-    path('sandwich/id/<int:sandwich_id>/', views.SandwichView.as_view()),
+    path('sandwich/<int:sandwich_id>/id', views.SandwichView.as_view()),
+    path('sandwich/<int:page>/<str:sandwich_kw>/<int:kw_kn>/', views.SandwichView.as_view()),
 ]

@@ -228,7 +228,7 @@ def search_kw_kn(queryset, kw, kn):
     elif kw == 'sauce':
         queryset = queryset.filter(Q(sauce__id__icontains=kn)).distinct()
     # elif kw == 'price-upper':
-    #     queryset = queryset.filter(Q(bread__id__icontains=kn)).distinct()
+    #     pass
     # else:
     #     pass
     return queryset
@@ -268,7 +268,7 @@ class SandwichView(APIView):
             sandwich_queryset = Sandwich.objects.all() # 모든 sandwich의 정보를 불러온다.
             # 검색 조건이 요청에 있는 지 확인
             kw_list = ('bread', 'topping', 'cheese', 'sauce', 'price-upper', 'price-lower')
-            if kwargs.get('sandwich_kw') in kw_list:
+            if kwargs.get('sandwich_kw') in kw_list and kwargs.get('kw_kn'):
                 sandwich_queryset = search_kw_kn(sandwich_queryset, kwargs.get('sandwich_kw'), kwargs.get('kw_kn'))
             # 페이지 요청이 있는 지 확인
             if kwargs.get('page'):
@@ -279,33 +279,29 @@ class SandwichView(APIView):
                 sandwich_queryset_serializer = SandwichSerializer(sandwich_queryset, many=True)
             return Response(sandwich_queryset_serializer.data, status=status.HTTP_200_OK)
         else:
-            sandwich_id = kwargs.get('sandwich_id')
-            sauce_serializer = SandwichSerializer(Sandwich.objects.get(id=sandwich_id)) # id에 해당하는 sauce의 정보를 불러온다.
-            return Response(sauce_serializer.data, status=status.HTTP_200_OK)
-    # 'sauce/sandwich_id' 로 'put' 하는 경우 = 소스를 수정합니다.
-    def put(self, request, **kwargs):
-        # id가 요청에 있는 지 확인
-        if kwargs.get('sandwich_id') is None:
-            return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
-        else:
-            sandwich_id = kwargs.get('sandwich_id')
-            sauce_object = Sauce.objects.get(id=sandwich_id)
-            update_sauce_serializer = SandwichSerializer(sauce_object, data=request.data)
-            # 유효한 요청을 확인
-            if update_sauce_serializer.is_valid():
-                update_sauce_serializer.save()
-                return Response(update_sauce_serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
-    # 'sauce/sandwich_id' 로 'delete' 하는 경우 = 소스를 삭제합니다.
+            sandwich_id = kwargs.get('sandwich_id') # id에 해당하는 sandwich의 정보를 불러온다.
+            sandwich = Sandwich.objects.get(id=sandwich_id)
+            bread_object = Bread.objects.get(id=sandwich.bread_id)
+            topping_object = Topping.objects.get(id=sandwich.topping_id)
+            cheese_object = Cheese.objects.get(id=sandwich.cheese_id)
+            sauce_object = Sauce.objects.get(id=sandwich.sauce_id)
+            # sandwich_serializer = SandwichSerializer(Sandwich.objects.get(id=sandwich_id))
+            # return Response(sandwich_serializer.data, status=status.HTTP_200_OK)
+            return Response({sandwich.id:{
+                    'bread':{'name':bread_object.name, 'stock':bread_object.stock, 'price':bread_object.price},
+                    'topping':{'name':topping_object.name, 'stock':topping_object.stock, 'price':topping_object.price}, 
+                    'cheese':{'name':cheese_object.name, 'stock':cheese_object.stock, 'price':cheese_object.price}, 
+                    'sauce':{'name':sauce_object.name, 'stock':sauce_object.stock, 'price':sauce_object.price}}}, 
+                    status=status.HTTP_200_OK)
+    # 'sandwich/sandwich_id' 로 'delete' 하는 경우 = 소스를 삭제합니다.
     def delete(self, request, **kwargs):
         # id가 요청에 있는 지 확인
         if kwargs.get('sandwich_id') is None:
             return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
         else:
             sandwich_id = kwargs.get('sandwich_id')
-            sauce_object = Sauce.objects.get(id=sandwich_id)
-            sauce_name = sauce_object.name
-            sauce_object.delete()
+            sandwich_object = Sandwich.objects.get(id=sandwich_id)
+            sandwich_name = sandwich_object.id
+            sandwich_object.delete()
             # 삭제한 소스의 이름을 알림
-            return Response(f"{sauce_name} removed", status=status.HTTP_200_OK)
+            return Response(f"{sandwich_name} removed", status=status.HTTP_200_OK)
