@@ -273,12 +273,8 @@ def search_kw_kn(queryset, kw, kn):
         queryset = queryset.filter(Q(topping__id__icontains=kn)).distinct()
     elif kw == 'cheese':
         queryset = queryset.filter(Q(cheese__id__icontains=kn)).distinct()
-    elif kw == 'sauce':
+    else:
         queryset = queryset.filter(Q(sauce__id__icontains=kn)).distinct()
-    # elif kw == 'price-upper':
-    #     pass
-    # else:
-    #     pass
     return queryset
 
 class SandwichView(APIView):
@@ -321,7 +317,7 @@ class SandwichView(APIView):
             sandwich_queryset = Sandwich.objects.all() # 모든 sandwich의 정보를 불러온다.
             sandwich_queryset = sandwich_queryset.filter(Q(existence=True)).distinct()
             # 검색 조건이 요청에 있는 지 확인
-            kw_list = ('bread', 'topping', 'cheese', 'sauce', 'price-upper', 'price-lower')
+            kw_list = ('bread', 'topping', 'cheese', 'sauce', 'price')
             if kwargs.get('sandwich_kw') in kw_list and kwargs.get('kw_kn'):
                 sandwich_queryset = search_kw_kn(sandwich_queryset, kwargs.get('sandwich_kw'), kwargs.get('kw_kn'))
             # 페이지 요청이 있는 지 확인
@@ -345,11 +341,19 @@ class SandwichView(APIView):
             cheese_object = Cheese.objects.get(id=sandwich.cheese_id)
             sauce_object = Sauce.objects.get(id=sandwich.sauce_id)
             # 빵, 토핑, 치즈, 소스의 이름, 재고, 가격 정보 제공
-            return Response({sandwich_id:{
-                    'bread':{'name':bread_object.name, 'stock':bread_object.stock, 'price':bread_object.price},
-                    'topping':{'name':topping_object.name, 'stock':topping_object.stock, 'price':topping_object.price}, 
-                    'cheese':{'name':cheese_object.name, 'stock':cheese_object.stock, 'price':cheese_object.price}, 
-                    'sauce':{'name':sauce_object.name, 'stock':sauce_object.stock, 'price':sauce_object.price}}}, 
+            return Response(
+                    {'id':sandwich_id,
+                    'price':sum(
+                        [bread_object.price, bread_object.price, 
+                        cheese_object.price, sauce_object.price]
+                        ), 
+                    'ingredients':{
+                            'bread':{'name':bread_object.name, 'stock':bread_object.stock, 'price':bread_object.price},
+                            'topping':{'name':topping_object.name, 'stock':topping_object.stock, 'price':bread_object.price}, 
+                            'cheese':{'name':cheese_object.name, 'stock':cheese_object.stock, 'price':cheese_object.price}, 
+                            'sauce':{'name':sauce_object.name, 'stock':sauce_object.stock, 'price':sauce_object.price}
+                        }
+                    }, 
                     status=status.HTTP_200_OK)
     # 'sandwich/sandwich_id' 로 'delete' 하는 경우 = 샌드위치를 삭제합니다.
     def delete(self, request, **kwargs):
